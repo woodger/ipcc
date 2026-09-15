@@ -1,7 +1,11 @@
 import ipaddress
 from io import BytesIO
+from types import SimpleNamespace
+from unittest.mock import patch
+from urllib.error import URLError
 
-from app.ipcc import parse_stream, collapse_networks
+import app.ipcc as ipcc_module
+from app.ipcc import FetchError, collapse_networks, fetch_networks, parse_stream
 
 
 FAKE_DATA = b"""
@@ -80,3 +84,55 @@ ripencc|US|ipv4|10.0.16.0|4096|20240101|allocated
     assert len(collapsed) == 1
 
     assert collapsed[0] == ipaddress.ip_network("10.0.0.0/19")
+
+
+def test_fetch_networks_rejects_partial_results():
+
+    def urlopen(url, timeout):
+
+        assert timeout == ipcc_module.TIMEOUT
+
+        if url == "broken":
+            raise URLError("unavailable")
+
+        return BytesIO(FAKE_DATA)
+
+    with (
+        patch.object(ipcc_module, "URLS", {"working": "working", "broken": "broken"}),
+        patch.object(ipcc_module.urllib.request, "urlopen", side_effect=urlopen),
+    ):
+        try:
+            fetch_networks("US", ipv6=False)
+        except FetchError as error:
+            assert error.registries == ("broken",)
+        else:
+            raise AssertionError("FetchError was not raised")
+
+
+def test_main_does_not_save_partial_results():
+
+    args = SimpleNamespace(
+        country="US",
+        ipv6=False,
+        output="us.zone",
+        verbose=False,
+    )
+
+    with (
+        patch.object(ipcc_module, "parse_args", return_value=args),
+        patch.object(ipcc_module, "setup_logging"),
+        patch.object(
+            ipcc_module,
+            "fetch_networks",
+            side_effect=FetchError(["arin"]),
+        ),
+        patch.object(ipcc_module, "save_networks") as save_networks,
+    ):
+        try:
+            ipcc_module.main()
+        except SystemExit as error:
+            assert error.code == 1
+        else:
+            raise AssertionError("SystemExit was not raised")
+
+    save_networks.assert_not_called()

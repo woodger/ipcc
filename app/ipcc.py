@@ -17,6 +17,17 @@ URLS = {
 TIMEOUT = 30
 
 
+class FetchError(RuntimeError):
+
+    def __init__(self, registries):
+
+        self.registries = tuple(registries)
+
+        super().__init__(
+            f"Failed to download RIR data: {', '.join(self.registries)}"
+        )
+
+
 def setup_logging(verbose):
 
     logging.basicConfig(
@@ -78,6 +89,7 @@ def parse_stream(stream, country, ipv6):
 def fetch_networks(country, ipv6):
 
     networks = []
+    failed = []
 
     for name, url in URLS.items():
 
@@ -94,6 +106,12 @@ def fetch_networks(country, ipv6):
         except Exception as e:
 
             logging.warning(f"{name} failed: {e}")
+
+            failed.append(name)
+
+    if failed:
+
+        raise FetchError(failed)
 
     return networks
 
@@ -153,10 +171,17 @@ def main():
 
     output = args.output or f"{country.lower()}.zone"
 
-    networks = fetch_networks(
-        country,
-        args.ipv6,
-    )
+    try:
+
+        networks = fetch_networks(
+            country,
+            args.ipv6,
+        )
+
+    except FetchError as e:
+
+        logging.error(e)
+        sys.exit(1)
 
     if not networks:
 

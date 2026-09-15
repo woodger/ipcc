@@ -47,6 +47,8 @@ Generate USA IPv4:
 
 The program will download RIR data, select networks of the specified country, merge adjacent CIDRs, and save the result to a file.
 
+If any RIR download fails, the command exits without writing the output so that a partial list is never presented as complete.
+
 
 ## Testing
 
