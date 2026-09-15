@@ -2,7 +2,9 @@
 
 import ipaddress
 import logging
+import os
 import sys
+import tempfile
 import urllib.request
 
 from app.args import parse_args
@@ -197,18 +199,52 @@ def collapse_networks(networks):
 
 
 def save_networks(networks, filename):
-    """Write networks in ascending address order, one CIDR per line."""
+    """Atomically write networks in ascending address order."""
 
     networks = sorted(
         networks,
         key=lambda n: int(n.network_address),
     )
 
-    with open(filename, "w") as f:
+    directory = os.path.dirname(os.path.abspath(filename))
+    prefix = f".{os.path.basename(filename)}."
+    temporary_name = None
 
-        for net in networks:
+    try:
 
-            f.write(f"{net}\n")
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="ascii",
+            newline="\n",
+            dir=directory,
+            prefix=prefix,
+            suffix=".tmp",
+            delete=False,
+        ) as f:
+
+            temporary_name = f.name
+
+            for net in networks:
+
+                f.write(f"{net}\n")
+
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(temporary_name, filename)
+        temporary_name = None
+
+    finally:
+
+        if temporary_name is not None:
+
+            try:
+
+                os.unlink(temporary_name)
+
+            except FileNotFoundError:
+
+                pass
 
 
 def validate_country(country):

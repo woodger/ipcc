@@ -1,5 +1,7 @@
 import ipaddress
 from io import BytesIO
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest.mock import patch
 from urllib.error import URLError
@@ -11,6 +13,7 @@ from app.ipcc import (
     collapse_networks,
     fetch_networks,
     parse_stream,
+    save_networks,
 )
 
 
@@ -151,6 +154,49 @@ ripencc|US|ipv4|10.0.16.0|4096|20240101|allocated
     assert len(collapsed) == 1
 
     assert collapsed[0] == ipaddress.ip_network("10.0.0.0/19")
+
+
+def test_save_networks_replaces_output_atomically():
+
+    with TemporaryDirectory() as directory:
+        output = Path(directory) / "us.zone"
+        output.write_text("old data\n")
+
+        save_networks(
+            [
+                ipaddress.ip_network("192.0.2.0/24"),
+                ipaddress.ip_network("10.0.0.0/8"),
+            ],
+            output,
+        )
+
+        assert output.read_text() == "10.0.0.0/8\n192.0.2.0/24\n"
+        assert list(output.parent.iterdir()) == [output]
+
+
+def test_save_networks_preserves_output_on_failure():
+
+    with TemporaryDirectory() as directory:
+        output = Path(directory) / "us.zone"
+        output.write_text("complete data\n")
+
+        with patch.object(
+            ipcc_module.os,
+            "replace",
+            side_effect=OSError("replace failed"),
+        ):
+            try:
+                save_networks(
+                    [ipaddress.ip_network("192.0.2.0/24")],
+                    output,
+                )
+            except OSError as error:
+                assert str(error) == "replace failed"
+            else:
+                raise AssertionError("OSError was not raised")
+
+        assert output.read_text() == "complete data\n"
+        assert list(output.parent.iterdir()) == [output]
 
 
 def test_fetch_networks_rejects_partial_results():
