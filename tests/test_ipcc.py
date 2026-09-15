@@ -34,6 +34,24 @@ def test_parse_ipv4():
     assert ipaddress.ip_network("5.20.0.0/20") in nets
 
 
+def test_parse_non_cidr_ipv4_range():
+
+    data = b"ripencc|US|ipv4|192.0.2.0|768|20240101|allocated\n"
+
+    nets = list(
+        parse_stream(
+            BytesIO(data),
+            country="US",
+            ipv6=False,
+        )
+    )
+
+    assert nets == [
+        ipaddress.ip_network("192.0.2.0/23"),
+        ipaddress.ip_network("192.0.4.0/24"),
+    ]
+
+
 def test_parse_ipv6():
 
     nets = list(

@@ -84,9 +84,19 @@ def parse_stream(stream, country, ipv6):
 
             else:
 
-                yield ipaddress.ip_network(
-                    f"{start}/{prefix_v4(int(value))}",
-                    strict=False,
+                first = ipaddress.IPv4Address(start)
+                count = int(value)
+
+                if count <= 0:
+                    raise ValueError("IPv4 address count must be positive")
+
+                last = ipaddress.IPv4Address(
+                    int(first) + count - 1
+                )
+
+                yield from ipaddress.summarize_address_range(
+                    first,
+                    last,
                 )
 
         except ValueError:

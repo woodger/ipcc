@@ -59,7 +59,7 @@ python -m pip install -e ".[test]"
 pytest
 ```
 
-The tests cover argument parsing, RIR record parsing, network aggregation, and incomplete download handling.
+The tests cover argument parsing, arbitrary IPv4 ranges, RIR record parsing, network aggregation, and incomplete download handling.
 
 
 ## CLI Reference
