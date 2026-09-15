@@ -2,16 +2,18 @@
 name = "ipcc"
 version = "1.0.0"
 requires-python = ">=3.9"
-dependencies = [
-    "tqdm>=4.66,<5.0"
-]
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest>=7,<9"]
 
 [build-system]
 requires = ["setuptools>=65.0.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-where = ["app"]
+where = ["."]
+include = ["app*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

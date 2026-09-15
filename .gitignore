@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*.zone
 .env
 venv/
 *.pth

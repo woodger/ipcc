@@ -52,13 +52,14 @@ If any RIR download fails, the command exits without writing the output so that 
 
 ## Testing
 
-To run tests, use **pytest**:
+Install the test dependencies and run **pytest**:
 
 ```bash
+python -m pip install -e ".[test]"
 pytest
 ```
 
-Все тесты проходят, что гарантирует корректность парсинга и объединения сетей.
+The tests cover argument parsing, RIR record parsing, network aggregation, and incomplete download handling.
 
 
 ## CLI Reference
@@ -68,6 +69,7 @@ pytest
 | `--country` | ISO country code | RU               |
 | `--ipv6`    | Use IPv6         | false            |
 | `--output`  | Output file name | `<country>.zone` |
+| `--verbose` | Enable debug logs | false            |
 
 ## Output Format
 
