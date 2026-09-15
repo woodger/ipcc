@@ -45,9 +45,9 @@ Generate USA IPv4:
 ./ipcc --country US --output ~/us.zone
 ```
 
-The program will download RIR data, select networks of the specified country, merge adjacent CIDRs, and save the result to a file.
+The program will download RIR data, select allocated or assigned networks of the specified country, merge adjacent CIDRs, and save the result to a file.
 
-If any RIR download fails, the command exits without writing the output so that a partial list is never presented as complete.
+If any RIR download or relevant record parsing fails, the command exits without writing the output so that a partial list is never presented as complete.
 
 
 ## Testing
@@ -59,7 +59,7 @@ python -m pip install -e ".[test]"
 pytest
 ```
 
-The tests cover argument parsing, arbitrary IPv4 ranges, RIR record parsing, network aggregation, and incomplete download handling.
+The tests cover argument parsing, arbitrary IPv4 ranges, RIR record validation, network aggregation, and incomplete download handling.
 
 
 ## CLI Reference

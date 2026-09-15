@@ -17,6 +17,19 @@ URLS = {
 }
 
 TIMEOUT = 30
+ACTIVE_STATUSES = frozenset({"allocated", "assigned"})
+
+
+class RIRParseError(ValueError):
+    """Identify a malformed delegated record by source and line."""
+
+    def __init__(self, source, line_number, reason):
+
+        self.source = source
+        self.line_number = line_number
+        self.reason = reason
+
+        super().__init__(f"{source} line {line_number}: {reason}")
 
 
 class FetchError(RuntimeError):
@@ -50,26 +63,49 @@ def prefix_v4(count):
     return 32 - (count.bit_length() - 1)
 
 
-def parse_stream(stream, country, ipv6):
+def parse_stream(stream, country, ipv6, source=None):
     """Yield matching networks from a byte-oriented RIR delegated stream."""
 
     want = "ipv6" if ipv6 else "ipv4"
+    source_name = source or "RIR stream"
 
-    for raw in stream:
+    for line_number, raw in enumerate(stream, start=1):
 
-        line = raw.decode().strip()
+        try:
+
+            line = raw.decode("ascii").strip()
+
+        except UnicodeDecodeError as e:
+
+            raise RIRParseError(
+                source_name,
+                line_number,
+                f"record is not ASCII: {e}",
+            ) from e
 
         if not line or line[0] == "#":
             continue
 
         parts = line.split("|")
 
-        if len(parts) < 7:
+        if len(parts) == 6 and parts[-1] == "summary":
             continue
 
-        _, cc, iptype, start, value, *_ = parts
+        if len(parts) < 7:
 
-        if cc != country or iptype != want:
+            raise RIRParseError(
+                source_name,
+                line_number,
+                f"expected at least 7 fields, got {len(parts)}",
+            )
+
+        registry, cc, iptype, start, value, _, status, *_ = parts
+
+        if (
+            cc != country
+            or iptype != want
+            or status not in ACTIVE_STATUSES
+        ):
             continue
 
         try:
@@ -77,9 +113,8 @@ def parse_stream(stream, country, ipv6):
             # RIR records store an IPv6 prefix length but an IPv4 address count.
             if ipv6:
 
-                yield ipaddress.ip_network(
+                yield ipaddress.IPv6Network(
                     f"{start}/{int(value)}",
-                    strict=False,
                 )
 
             else:
@@ -99,9 +134,15 @@ def parse_stream(stream, country, ipv6):
                     last,
                 )
 
-        except ValueError:
+        except ValueError as e:
 
-            logging.debug("Bad entry skipped")
+            record_source = source or registry or source_name
+
+            raise RIRParseError(
+                record_source,
+                line_number,
+                str(e) or type(e).__name__,
+            ) from e
 
 
 def fetch_networks(country, ipv6):
@@ -119,7 +160,12 @@ def fetch_networks(country, ipv6):
             with urllib.request.urlopen(url, timeout=TIMEOUT) as r:
 
                 networks.extend(
-                    parse_stream(r, country, ipv6)
+                    parse_stream(
+                        r,
+                        country,
+                        ipv6,
+                        source=name,
+                    )
                 )
 
         except Exception as e:

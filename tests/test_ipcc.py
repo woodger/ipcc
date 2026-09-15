@@ -5,7 +5,13 @@ from unittest.mock import patch
 from urllib.error import URLError
 
 import app.ipcc as ipcc_module
-from app.ipcc import FetchError, collapse_networks, fetch_networks, parse_stream
+from app.ipcc import (
+    FetchError,
+    RIRParseError,
+    collapse_networks,
+    fetch_networks,
+    parse_stream,
+)
 
 
 FAKE_DATA = b"""
@@ -82,6 +88,49 @@ def test_country_filtering():
     assert ipaddress.ip_network("1.1.1.0/24") in nets
 
 
+def test_status_filtering():
+
+    data = b"""
+ripencc|US|ipv4|192.0.2.0|256|20240101|available
+ripencc|US|ipv4|198.51.100.0|256|20240101|reserved
+ripencc|US|ipv4|203.0.113.0|256|20240101|assigned
+"""
+
+    nets = list(
+        parse_stream(
+            BytesIO(data),
+            country="US",
+            ipv6=False,
+        )
+    )
+
+    assert nets == [ipaddress.ip_network("203.0.113.0/24")]
+
+
+def test_rejects_malformed_matching_record():
+
+    data = b"""# delegated data
+ripencc|US|ipv4|invalid|256|20240101|allocated
+"""
+
+    try:
+        list(
+            parse_stream(
+                BytesIO(data),
+                country="US",
+                ipv6=False,
+                source="ripencc",
+            )
+        )
+    except RIRParseError as error:
+        assert error.source == "ripencc"
+        assert error.line_number == 2
+        assert error.reason
+        assert str(error).startswith("ripencc line 2:")
+    else:
+        raise AssertionError("RIRParseError was not raised")
+
+
 def test_collapse_networks():
 
     data = b"""
@@ -123,6 +172,26 @@ def test_fetch_networks_rejects_partial_results():
             fetch_networks("US", ipv6=False)
         except FetchError as error:
             assert error.registries == ("broken",)
+        else:
+            raise AssertionError("FetchError was not raised")
+
+
+def test_fetch_networks_rejects_malformed_source():
+
+    data = b"ripencc|US|ipv4|invalid|256|20240101|allocated\n"
+
+    with (
+        patch.object(ipcc_module, "URLS", {"ripencc": "source"}),
+        patch.object(
+            ipcc_module.urllib.request,
+            "urlopen",
+            return_value=BytesIO(data),
+        ),
+    ):
+        try:
+            fetch_networks("US", ipv6=False)
+        except FetchError as error:
+            assert error.registries == ("ripencc",)
         else:
             raise AssertionError("FetchError was not raised")
 
