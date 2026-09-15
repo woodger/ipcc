@@ -1,3 +1,5 @@
+"""Generate complete, aggregated country CIDR lists from RIR data."""
+
 import ipaddress
 import logging
 import sys
@@ -18,6 +20,7 @@ TIMEOUT = 30
 
 
 class FetchError(RuntimeError):
+    """Report registries whose delegated data could not be read."""
 
     def __init__(self, registries):
 
@@ -29,6 +32,7 @@ class FetchError(RuntimeError):
 
 
 def setup_logging(verbose):
+    """Configure concise CLI logging at the requested verbosity."""
 
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
@@ -37,7 +41,9 @@ def setup_logging(verbose):
 
 
 def prefix_v4(count):
+    """Convert a power-of-two IPv4 address count to a CIDR prefix length."""
 
+    # One CIDR can represent only a positive power-of-two address count.
     if count <= 0 or (count & (count - 1)):
         raise ValueError(count)
 
@@ -45,6 +51,7 @@ def prefix_v4(count):
 
 
 def parse_stream(stream, country, ipv6):
+    """Yield matching networks from a byte-oriented RIR delegated stream."""
 
     want = "ipv6" if ipv6 else "ipv4"
 
@@ -67,6 +74,7 @@ def parse_stream(stream, country, ipv6):
 
         try:
 
+            # RIR records store an IPv6 prefix length but an IPv4 address count.
             if ipv6:
 
                 yield ipaddress.ip_network(
@@ -87,6 +95,7 @@ def parse_stream(stream, country, ipv6):
 
 
 def fetch_networks(country, ipv6):
+    """Collect networks from every RIR or reject the incomplete result."""
 
     networks = []
     failed = []
@@ -111,12 +120,14 @@ def fetch_networks(country, ipv6):
 
     if failed:
 
+        # Partial data must never overwrite a previously complete output file.
         raise FetchError(failed)
 
     return networks
 
 
 def collapse_networks(networks):
+    """Merge overlapping and adjacent networks into the smallest CIDR list."""
 
     logging.info(f"Collected: {len(networks)}")
 
@@ -130,6 +141,7 @@ def collapse_networks(networks):
 
 
 def save_networks(networks, filename):
+    """Write networks in ascending address order, one CIDR per line."""
 
     networks = sorted(
         networks,
@@ -144,6 +156,7 @@ def save_networks(networks, filename):
 
 
 def validate_country(country):
+    """Normalize a two-letter country code or reject its shape."""
 
     if len(country) != 2 or not country.isalpha():
 
@@ -155,6 +168,7 @@ def validate_country(country):
 
 
 def main():
+    """Run the command-line workflow."""
 
     args = parse_args()
 

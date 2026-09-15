@@ -1,7 +1,10 @@
+"""Command-line argument definitions for IPCC."""
+
 import argparse
 
 
 def parse_args():
+    """Parse command-line options into an argparse namespace."""
 
     parser = argparse.ArgumentParser(
         description="Generate aggregated CIDR blocks per country from RIR delegated lists"
